@@ -1,0 +1,31 @@
+{
+  "name": "ml-pipeline-builder",
+  "version": "1.0.0",
+  "description": "Expert ML pipeline guidance for tabular classification and regression. Covers EDA, feature engineering, model selection (scikit-learn, XGBoost, LightGBM, CatBoost), cross-validation, hyperparameter tuning, imbalanced data handling, SHAP explainability, and data leakage prevention.",
+  "author": {
+    "name": "asim266"
+  },
+  "repository": "https://github.com/asim266/ml-pipeline-builder",
+  "homepage": "https://github.com/asim266/ml-pipeline-builder",
+  "license": "MIT",
+  "keywords": [
+    "machine-learning",
+    "scikit-learn",
+    "sklearn",
+    "xgboost",
+    "lightgbm",
+    "catboost",
+    "classification",
+    "regression",
+    "feature-engineering",
+    "cross-validation",
+    "hyperparameter-tuning",
+    "data-leakage",
+    "imbalanced-data",
+    "shap",
+    "pipeline",
+    "eda",
+    "model-selection"
+  ],
+  "skills": ["./skills/ml-pipeline-builder"]
+}
