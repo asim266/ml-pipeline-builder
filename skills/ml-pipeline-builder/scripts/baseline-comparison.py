@@ -7,6 +7,7 @@ Usage:
 """
 
 import argparse
+import sys
 import warnings
 
 import numpy as np
@@ -20,11 +21,23 @@ from sklearn.model_selection import StratifiedKFold, KFold, cross_val_score, tra
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
-warnings.filterwarnings("ignore")
+from sklearn.exceptions import ConvergenceWarning
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 
 def run_baseline_comparison(filepath, target_col, task):
-    df = pd.read_csv(filepath)
+    try:
+        df = pd.read_csv(filepath)
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+        sys.exit(1)
+
+    if target_col not in df.columns:
+        print(f"Error: target column '{target_col}' not found.")
+        print(f"Available columns: {list(df.columns)}")
+        sys.exit(1)
+
     X = df.drop(columns=[target_col])
     y = df[target_col]
 
@@ -82,7 +95,7 @@ def run_baseline_comparison(filepath, target_col, task):
         scoring = "r2"
 
         models = {
-            "Ridge": Ridge(random_state=42),
+            "Ridge": Ridge(),
             "RandomForest": RandomForestRegressor(n_estimators=200, random_state=42),
             "GradientBoosting": GradientBoostingRegressor(n_estimators=200, random_state=42),
         }
@@ -92,7 +105,7 @@ def run_baseline_comparison(filepath, target_col, task):
         from xgboost import XGBClassifier, XGBRegressor
         if task == "classification":
             models["XGBoost"] = XGBClassifier(
-                n_estimators=200, random_state=42, use_label_encoder=False, eval_metric="logloss"
+                n_estimators=200, random_state=42, eval_metric="logloss"
             )
         else:
             models["XGBoost"] = XGBRegressor(n_estimators=200, random_state=42)

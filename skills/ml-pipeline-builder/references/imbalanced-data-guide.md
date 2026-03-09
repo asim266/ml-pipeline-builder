@@ -67,23 +67,33 @@ pipeline = ImbPipeline(steps=[
 
 ## Technique 3: Threshold Tuning
 
+**IMPORTANT:** Find the optimal threshold on a VALIDATION set, not the test set. Using test labels to select the threshold is data leakage.
+
 ```python
 from sklearn.metrics import precision_recall_curve
+from sklearn.model_selection import train_test_split
 
-# Train model with predict_proba
-pipeline.fit(X_train, y_train)
-y_proba = pipeline.predict_proba(X_test)[:, 1]
+# Split training data into train + validation
+X_tr, X_val, y_tr, y_val = train_test_split(
+    X_train, y_train, test_size=0.2, random_state=42, stratify=y_train
+)
 
-# Find optimal threshold
-precisions, recalls, thresholds = precision_recall_curve(y_test, y_proba)
-f1_scores = 2 * (precisions * recalls) / (precisions + recalls + 1e-8)
+# Train and find threshold on validation set
+pipeline.fit(X_tr, y_tr)
+y_val_proba = pipeline.predict_proba(X_val)[:, 1]
+
+precisions, recalls, thresholds = precision_recall_curve(y_val, y_val_proba)
+# Drop last element (precisions/recalls have len = thresholds + 1)
+f1_scores = 2 * (precisions[:-1] * recalls[:-1]) / (precisions[:-1] + recalls[:-1] + 1e-8)
 optimal_idx = f1_scores.argmax()
 optimal_threshold = thresholds[optimal_idx]
 print(f"Optimal threshold: {optimal_threshold:.4f}")
 print(f"F1 at optimal threshold: {f1_scores[optimal_idx]:.4f}")
 
-# Apply custom threshold
-y_pred_custom = (y_proba >= optimal_threshold).astype(int)
+# Re-train on full training set, then apply threshold to TEST set (evaluated once)
+pipeline.fit(X_train, y_train)
+y_test_proba = pipeline.predict_proba(X_test)[:, 1]
+y_pred_custom = (y_test_proba >= optimal_threshold).astype(int)
 ```
 
 ## Technique 4: Ensemble Methods for Imbalance

@@ -163,7 +163,7 @@ def build_model_pipeline(preprocessor, model):
 # Example: Quick baseline comparison
 models = {
     'logistic': LogisticRegression(max_iter=1000, random_state=42),
-    'rf': RandomForestClassifier(n_estimators=100, random_state=42),
+    'rf': RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1),
 }
 ```
 
@@ -188,25 +188,31 @@ models = {
 from sklearn.model_selection import cross_val_score, StratifiedKFold, KFold
 from sklearn.metrics import (
     classification_report, confusion_matrix, roc_auc_score,
-    mean_absolute_error, r2_score, root_mean_squared_error
+    mean_absolute_error, mean_squared_error, r2_score
 )
+import numpy as np
 
 def evaluate_classification(pipeline, X_train, y_train, X_test, y_test, cv=5):
-    """Full evaluation for classification."""
+    """Full evaluation for classification (binary and multiclass)."""
     # Cross-validation
     cv_strategy = StratifiedKFold(n_splits=cv, shuffle=True, random_state=42)
     cv_scores = cross_val_score(pipeline, X_train, y_train, cv=cv_strategy, scoring='roc_auc')
     print(f"CV ROC-AUC: {cv_scores.mean():.4f} (+/- {cv_scores.std():.4f})")
 
-    # Test set evaluation
+    # Re-fit on full training set (CV uses clones internally, pipeline is still unfitted)
     pipeline.fit(X_train, y_train)
     y_pred = pipeline.predict(X_test)
-    y_proba = pipeline.predict_proba(X_test)[:, 1] if hasattr(pipeline, 'predict_proba') else None
 
     print(f"\nClassification Report:\n{classification_report(y_test, y_pred)}")
     print(f"Confusion Matrix:\n{confusion_matrix(y_test, y_pred)}")
-    if y_proba is not None:
-        print(f"Test ROC-AUC: {roc_auc_score(y_test, y_proba):.4f}")
+
+    if hasattr(pipeline, 'predict_proba'):
+        y_proba = pipeline.predict_proba(X_test)
+        n_classes = y_proba.shape[1]
+        if n_classes == 2:
+            print(f"Test ROC-AUC: {roc_auc_score(y_test, y_proba[:, 1]):.4f}")
+        else:
+            print(f"Test ROC-AUC (OvR): {roc_auc_score(y_test, y_proba, multi_class='ovr', average='weighted'):.4f}")
 
 def evaluate_regression(pipeline, X_train, y_train, X_test, y_test, cv=5):
     """Full evaluation for regression."""
@@ -218,7 +224,8 @@ def evaluate_regression(pipeline, X_train, y_train, X_test, y_test, cv=5):
     y_pred = pipeline.predict(X_test)
     print(f"Test R2: {r2_score(y_test, y_pred):.4f}")
     print(f"Test MAE: {mean_absolute_error(y_test, y_pred):.4f}")
-    print(f"Test RMSE: {root_mean_squared_error(y_test, y_pred):.4f}")
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    print(f"Test RMSE: {rmse:.4f}")
 ```
 
 #### 6. Hyperparameter Tuning
@@ -269,7 +276,7 @@ def objective(trial):
         'subsample': trial.suggest_float('subsample', 0.6, 1.0),
         'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
     }
-    model = XGBClassifier(**params, random_state=42, use_label_encoder=False, eval_metric='logloss')
+    model = XGBClassifier(**params, random_state=42, eval_metric='logloss')
     pipe = build_model_pipeline(preprocessor, model)
     cv = StratifiedKFold(5, shuffle=True, random_state=42)
     scores = cross_val_score(pipe, X_train, y_train, cv=cv, scoring='roc_auc')
@@ -324,16 +331,17 @@ def explain_model(pipeline, X_test, feature_names=None):
         feature_names = preprocessor.get_feature_names_out()
 
     explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(X_test_transformed)
+    explanation = explainer(X_test_transformed)
 
-    # Summary plot
-    shap.summary_plot(shap_values, X_test_transformed, feature_names=feature_names)
+    # Summary plot (modern SHAP API >= 0.41)
+    shap.summary_plot(explanation, feature_names=feature_names)
 ```
 
 #### 9. Model Export & Saving
 
 ```python
 import joblib
+from pathlib import Path
 
 def save_pipeline(pipeline, filepath='model_pipeline.joblib'):
     """Save the complete pipeline (preprocessor + model)."""
@@ -341,8 +349,28 @@ def save_pipeline(pipeline, filepath='model_pipeline.joblib'):
     print(f"Pipeline saved to {filepath}")
 
 def load_pipeline(filepath='model_pipeline.joblib'):
-    """Load a saved pipeline."""
-    return joblib.load(filepath)
+    """Load a saved pipeline.
+
+    SECURITY WARNING: joblib files can execute arbitrary code on load.
+    Only load model files YOU created from TRUSTED sources.
+    NEVER load .joblib files from untrusted users or the internet.
+    """
+    path = Path(filepath)
+    if not path.exists():
+        raise FileNotFoundError(f"Model file not found: {filepath}")
+    if path.suffix not in ('.joblib', '.pkl'):
+        raise ValueError(f"Unexpected file extension: {path.suffix}")
+    return joblib.load(path)
+```
+
+**Security note:** For safer model serving in production, consider exporting to ONNX format instead of joblib, as ONNX files do not execute arbitrary code on load:
+```python
+from skl2onnx import convert_sklearn
+from skl2onnx.common.data_types import FloatTensorType
+initial_type = [('float_input', FloatTensorType([None, n_features]))]
+onnx_model = convert_sklearn(pipeline, initial_types=initial_type)
+with open("model.onnx", "wb") as f:
+    f.write(onnx_model.SerializeToString())
 ```
 
 ## Data Leakage Checklist

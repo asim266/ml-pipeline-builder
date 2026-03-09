@@ -150,7 +150,7 @@ from sklearn.ensemble import StackingClassifier
 
 estimators = [
     ('rf', RandomForestClassifier(n_estimators=200, random_state=42)),
-    ('xgb', XGBClassifier(n_estimators=200, random_state=42, use_label_encoder=False, eval_metric='logloss')),
+    ('xgb', XGBClassifier(n_estimators=200, random_state=42, eval_metric='logloss')),
     ('lgbm', LGBMClassifier(n_estimators=200, random_state=42, verbose=-1)),
 ]
 

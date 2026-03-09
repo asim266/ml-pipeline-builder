@@ -16,7 +16,16 @@ import seaborn as sns
 
 
 def quick_eda(filepath, target_col, task="auto"):
-    df = pd.read_csv(filepath)
+    try:
+        df = pd.read_csv(filepath)
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+        sys.exit(1)
+
+    if target_col not in df.columns:
+        print(f"Error: target column '{target_col}' not found.")
+        print(f"Available columns: {list(df.columns)}")
+        sys.exit(1)
 
     print("=" * 60)
     print("DATASET OVERVIEW")

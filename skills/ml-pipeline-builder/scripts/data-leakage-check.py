@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Static analysis to detect common data leakage patterns in ML code.
 
+NOTE: This checker analyzes single lines only and may miss multi-line expressions.
+It is a best-effort heuristic, not a substitute for manual code review.
+
 Usage:
     python data-leakage-check.py path/to/your/script.py
     python data-leakage-check.py path/to/notebook.py
@@ -89,7 +92,7 @@ LEAKAGE_PATTERNS = [
 
 
 def check_file(filepath):
-    content = Path(filepath).read_text()
+    content = Path(filepath).read_text(encoding="utf-8", errors="replace")
     lines = content.split("\n")
 
     findings = []
